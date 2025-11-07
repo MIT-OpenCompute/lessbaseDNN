@@ -9,7 +9,10 @@ typedef enum {
     LAYER_RELU,
     LAYER_SIGMOID,
     LAYER_TANH,
-    LAYER_SOFTMAX
+    LAYER_SOFTMAX, 
+    LAYER_MSE_LOSS, 
+    LAYER_CE_LOSS, 
+    LAYER_BCE_LOSS, 
 } LayerType; 
 
 typedef struct {
@@ -19,6 +22,9 @@ typedef struct {
             size_t in_features; 
             size_t out_features; 
         } linear;
+        struct {
+            Tensor *targets;
+        } loss;
     } params; 
 } LayerConfig;
 
@@ -27,6 +33,9 @@ typedef struct {
 #define SIGMOID() (LayerConfig){ .type = LAYER_SIGMOID }
 #define TANH() (LayerConfig){ .type = LAYER_TANH }
 #define SOFTMAX() (LayerConfig){ .type = LAYER_SOFTMAX }
+#define MSE_LOSS(target) (LayerConfig){ .type = LAYER_MSE_LOSS, .params.loss = { target } }
+#define CE_LOSS(target) (LayerConfig){ .type = LAYER_CE_LOSS, .params.loss = { target } }
+#define BCE_LOSS(target) (LayerConfig){ .type = LAYER_BCE_LOSS, .params.loss = { target } }
 
 typedef struct Layer Layer;
 

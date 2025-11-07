@@ -1,143 +1,75 @@
-#include "../../include/trebuchet/trebuchet.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include "trebuchet/trebuchet.h"
 
-// Simple MNIST-like data generator (for demonstration)
-// In practice, you'd load actual MNIST data
-void generate_sample_data(Tensor *X, Tensor *y, size_t batch_size) {
-    // Generate random input (28*28 = 784 features)
-    for (size_t i = 0; i < X->size; i++) {
-        X->data[i] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-    }
-    
-    // Generate random labels (one-hot encoded, 10 classes)
-    for (size_t i = 0; i < y->size; i++) {
-        y->data[i] = 0.0f;
-    }
-    for (size_t i = 0; i < batch_size; i++) {
-        int label = rand() % 10;
-        y->data[i * 10 + label] = 1.0f;
-    }
-}
+#define INPUT_SIZE 784
+#define HIDDEN_SIZE 64
+#define OUTPUT_SIZE 10
+#define NUM_SAMPLES 50
+#define NUM_EPOCHS 5
+#define LEARNING_RATE 0.01f
 
-// Calculate accuracy
-float loss_accuracy(Tensor *predictions, Tensor *targets, size_t batch_size) {
-    int correct = 0;
-    for (size_t i = 0; i < batch_size; i++) {
-        int pred_class = 0;
-        float max_pred = predictions->data[i * 10];
-        for (int j = 1; j < 10; j++) {
-            if (predictions->data[i * 10 + j] > max_pred) {
-                max_pred = predictions->data[i * 10 + j];
-                pred_class = j;
-            }
+void generate_data(Tensor *X, Tensor *y) {
+    for (size_t i = 0; i < NUM_SAMPLES; i++) {
+        for (size_t j = 0; j < INPUT_SIZE; j++) {
+            X->data[i * INPUT_SIZE + j] = ((float)rand() / RAND_MAX) * 0.1f;
         }
-        
-        int true_class = 0;
-        for (int j = 0; j < 10; j++) {
-            if (targets->data[i * 10 + j] == 1.0f) {
-                true_class = j;
-                break;
-            }
-        }
-        
-        if (pred_class == true_class) {
-            correct++;
+        int label = rand() % OUTPUT_SIZE;
+        for (size_t j = 0; j < OUTPUT_SIZE; j++) {
+            y->data[i * OUTPUT_SIZE + j] = (j == label) ? 1.0f : 0.0f;
         }
     }
-    return (float)correct / batch_size;
 }
 
 int main() {
-    srand(time(NULL));
+    srand(42);
     
-    // Hyperparameters
-    const size_t input_size = 784;    // 28x28 MNIST images
-    const size_t hidden_size = 128;
-    const size_t output_size = 10;    // 10 classes (digits 0-9)
-    const size_t batch_size = 32;
-    const size_t num_epochs = 10;
-    const float learning_rate = 0.01f;
+    printf("MNIST\n\n");
     
-    printf("=== MNIST MLP Classifier ===\n");
-    printf("Architecture: %zu -> %zu -> %zu\n", input_size, hidden_size, output_size);
-    printf("Batch size: %zu, Epochs: %zu, LR: %.4f\n\n", batch_size, num_epochs, learning_rate);
+    size_t data_shape[] = {NUM_SAMPLES, INPUT_SIZE};
+    size_t label_shape[] = {NUM_SAMPLES, OUTPUT_SIZE};
+    Tensor *X = tensor_create(data_shape, 2);
+    Tensor *y = tensor_create(label_shape, 2);
+    generate_data(X, y);
     
-    // Build MLP network
     Network *net = network_create();
-    network_add_layer(net, layer_linear_create(input_size, hidden_size));
-    network_add_layer(net, layer_relu_create());
-    network_add_layer(net, layer_linear_create(hidden_size, output_size));
-    network_add_layer(net, layer_softmax_create());
+    network_add_layer(net, layer_create(LINEAR(INPUT_SIZE, HIDDEN_SIZE)));
+    network_add_layer(net, layer_create(RELU()));
+    network_add_layer(net, layer_create(LINEAR(HIDDEN_SIZE, OUTPUT_SIZE)));
+    network_add_layer(net, layer_create(SOFTMAX()));
+    network_add_layer(net, layer_create(CE_LOSS(y)));
     
-    printf("Network created with %zu layers\n\n", net->num_layers);
+    Optimizer *opt = optimizer_create(net, SGD(LEARNING_RATE, 0.9f));
+
+    printf("Training...\n");
+    network_train(net, opt, X, y, NUM_EPOCHS, NUM_SAMPLES, 1);
+    network_remove_last_layer(net);
     
-    // Create optimizer
-    Optimizer *optimizer = optimizer_sgd_from_network(net, learning_rate, 0.9f);
-    
-    // Training data tensors
-    size_t input_shape[2] = {batch_size, input_size};
-    size_t target_shape[2] = {batch_size, output_size};
-    
-    Tensor *X_train = tensor_create(input_shape, 2);
-    Tensor *y_train = tensor_create(target_shape, 2);
-    
-    // Training loop
-    printf("Training:\n");
-    for (size_t epoch = 0; epoch < num_epochs; epoch++) {
-        // Generate training batch
-        generate_sample_data(X_train, y_train, batch_size);
-        
-        // Forward pass
-        Tensor *output = network_forward(net, X_train);
-        
-        // Compute loss
-        Tensor *loss = loss_cross_entropy(output, y_train);
-        float loss_value = loss->data[0];
-        
-        // Backward pass
-        optimizer_zero_grad(optimizer);
-        tensor_backward(loss);
-        
-        // Update parameters
-        optimizer_step(optimizer);
-        
-        // Calculate accuracy
-        float acc = loss_accuracy(output, y_train, batch_size);
-        
-        printf("Epoch %zu/%zu - Loss: %.4f, Accuracy: %.2f%%\n", 
-               epoch + 1, num_epochs, loss_value, acc * 100.0f);
-        
-        // Cleanup tensors from this iteration
-        tensor_free(loss);
+    printf("\nInference...\n");
+    size_t single_shape[] = {1, INPUT_SIZE};
+    Tensor *input = tensor_create(single_shape, 2);
+    for (size_t i = 0; i < INPUT_SIZE; i++) {
+        input->data[i] = X->data[i];
     }
     
-    printf("Inference\n");
+    Tensor *pred = network_forward(net, input);
+    int pred_class = 0;
+    for (size_t i = 1; i < OUTPUT_SIZE; i++) {
+        if (pred->data[i] > pred->data[pred_class]) pred_class = i;
+    }
     
-    // Generate test batch
-    Tensor *X_test = tensor_create(input_shape, 2);
-    Tensor *y_test = tensor_create(target_shape, 2);
-    generate_sample_data(X_test, y_test, batch_size);
+    int true_class = 0;
+    for (size_t i = 0; i < OUTPUT_SIZE; i++) {
+        if (y->data[i] == 1.0f) { true_class = i; break; }
+    }
     
-    // Forward pass (inference mode - no gradients needed)
-    Tensor *test_output = network_forward(net, X_test);
+    printf("Sample 0 - True: %d, Predicted: %d\n", true_class, pred_class);
     
-    // Calculate test loss and accuracy
-    float test_loss = loss_cross_entropy_value(test_output, y_test);
-    float test_acc = loss_accuracy(test_output, y_test, batch_size);
-    
-    printf("Test Loss: %.4f, Test Accuracy: %.2f%%\n", test_loss, test_acc * 100.0f);
-    
-    // Cleanup
-    tensor_free(X_train);
-    tensor_free(y_train);
-    tensor_free(X_test);
-    tensor_free(y_test);
-    optimizer_free(optimizer);
+    tensor_free(input);
+    tensor_free(X);
+    tensor_free(y);
+    optimizer_free(opt);
     network_free(net);
-    
-    printf("\n=== Training Complete ===\n");
     
     return 0;
 }
