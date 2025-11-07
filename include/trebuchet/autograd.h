@@ -10,9 +10,6 @@ void backward_mul(Tensor *C);
 void backward_matmul(Tensor *C);
 void backward_transpose(Tensor *C);
 
-// Linear combination gradient
-void backward_linear(Tensor *Z);
-
 // Activation function gradients
 void backward_relu(Tensor *A);
 void backward_sigmoid(Tensor *A);

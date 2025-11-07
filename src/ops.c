@@ -64,6 +64,21 @@ Tensor* tensor_add(Tensor *A, Tensor *B) {
     Tensor *C = tensor_create(A->shape, A->ndim);
     if (!C) return NULL;
 
+    // temporary solution, should probably add broadcasting support for other operations too
+    if (A->ndim == 2 && B->ndim == 1 && A->shape[1] == B->shape[0]) {
+        Tensor *C = tensor_create(A->shape, A->ndim);
+        if (!C) return NULL;
+        
+        for (size_t i = 0; i < A->shape[0]; i++) {
+            for (size_t j = 0; j < A->shape[1]; j++) {
+                C->data[i * A->shape[1] + j] = A->data[i * A->shape[1] + j] + B->data[j];
+            }
+        }
+        
+        grad_update_two_vars(A, B, C, add_func, OP_ADD, backward_add);
+        return C;
+    }
+
     tensor_ewise(A, B, C, add_func, OP_ADD, backward_add);
     return C;
 }
@@ -85,27 +100,77 @@ Tensor* tensor_mul(Tensor *A, Tensor *B) {
 }
 
 Tensor* tensor_matmul(Tensor *A, Tensor *B) {
-    if (!A || !B) return NULL; 
-    if (A->ndim != 2 || B->ndim != 2) return NULL; 
-    if (A->shape[1] != B->shape[0]) return NULL; 
-
-    size_t C_shape[2] = {A->shape[0], B->shape[1]}; 
-    Tensor *C = tensor_create(C_shape, 2);
-    if (!C) return NULL; 
-
-    for (size_t i = 0; i < A->shape[0]; i++) {
-        for (size_t j = 0; j < B->shape[1]; j++) {
+    if (!A || !B) return NULL;
+    
+    if (A->ndim == 1 && B->ndim == 1) {
+        if (A->shape[0] != B->shape[0]) return NULL;
+        
+        Tensor *C = tensor_create((size_t[]){1}, 1);
+        if (!C) return NULL;
+        
+        float acc = 0.0f;
+        for (size_t i = 0; i < A->shape[0]; i++) {
+            acc += A->data[i] * B->data[i];
+        }
+        C->data[0] = acc;
+        
+        grad_update_two_vars(A, B, C, NULL, OP_MATMUL, backward_matmul);
+        return C;
+    } else if (A->ndim == 2 && B->ndim == 1) {
+        if (A->shape[1] != B->shape[0]) return NULL;
+        
+        Tensor *C = tensor_create((size_t[]){A->shape[0]}, 1);
+        if (!C) return NULL;
+        
+        for (size_t i = 0; i < A->shape[0]; i++) {
             float acc = 0.0f;
             for (size_t k = 0; k < A->shape[1]; k++) {
-                acc += A->data[i * A->shape[1] + k] * B->data[k * B->shape[1] + j];
+                acc += A->data[i * A->shape[1] + k] * B->data[k];
             }
-            C->data[i * C->shape[1] + j] = acc; 
+            C->data[i] = acc;
         }
+        
+        grad_update_two_vars(A, B, C, NULL, OP_MATMUL, backward_matmul);
+        return C;
+    } else if (A->ndim == 1 && B->ndim == 2) {
+        if (A->shape[0] != B->shape[0]) return NULL;
+        
+        Tensor *C = tensor_create((size_t[]){B->shape[1]}, 1);
+        if (!C) return NULL;
+        
+        for (size_t j = 0; j < B->shape[1]; j++) {
+            float acc = 0.0f;
+            for (size_t k = 0; k < A->shape[0]; k++) {
+                acc += A->data[k] * B->data[k * B->shape[1] + j];
+            }
+            C->data[j] = acc;
+        }
+        
+        grad_update_two_vars(A, B, C, NULL, OP_MATMUL, backward_matmul);
+        return C;
+    } else if (A->ndim == 2 && B->ndim == 2) {
+        if (A->shape[1] != B->shape[0]) return NULL;
+
+        size_t C_shape[2] = {A->shape[0], B->shape[1]}; 
+        Tensor *C = tensor_create(C_shape, 2);
+        if (!C) return NULL; 
+
+        for (size_t i = 0; i < A->shape[0]; i++) {
+            for (size_t j = 0; j < B->shape[1]; j++) {
+                float acc = 0.0f;
+                for (size_t k = 0; k < A->shape[1]; k++) {
+                    acc += A->data[i * A->shape[1] + k] * B->data[k * B->shape[1] + j];
+                }
+                C->data[i * C->shape[1] + j] = acc; 
+            }
+        }
+
+        grad_update_two_vars(A, B, C, NULL, OP_MATMUL, backward_matmul);
+
+        return C; 
+    } else {
+        return NULL; 
     }
-
-    grad_update_two_vars(A, B, C, NULL, OP_MATMUL, backward_matmul);
-
-    return C; 
 }
 
 Tensor* tensor_transpose(Tensor *A) {
@@ -125,32 +190,6 @@ Tensor* tensor_transpose(Tensor *A) {
     grad_update_one_var(A, C, NULL, OP_TRANSPOSE, backward_transpose);
 
     return C; 
-}
-
-// Linear combination
-Tensor* tensor_linear(Tensor *X, Tensor *W, Tensor *b) {
-    if (!X || !W || !b) return NULL; 
-    if (X->ndim != 2 || W->ndim != 2 || b->ndim != 1) return NULL; 
-    if (X->shape[1] != W->shape[0]) return NULL; 
-    if (W->shape[1] != b->shape[0]) return NULL; 
-
-    size_t Z_shape[2] = {X->shape[0], W->shape[1]};
-    Tensor *Z = tensor_create(Z_shape, 2);
-    if (!Z) return NULL; 
-
-    for (size_t i = 0; i < X->shape[0]; i++) {
-        for (size_t j = 0; j < W->shape[1]; j++) {
-            float acc = 0.0f;
-            for (size_t k = 0; k < X->shape[1]; k++) {
-                acc += X->data[i * X->shape[1] + k] * W->data[k * W->shape[1] + j];
-            }
-            Z->data[i * Z->shape[1] + j] = acc + b->data[j];
-        }
-    }
-
-    grad_update_three_vars(W, X, b, Z, NULL, OP_LINEAR, backward_linear);
-
-    return Z;
 }
 
 // Activation functions

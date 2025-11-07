@@ -1,6 +1,7 @@
 #include "trebuchet/layer.h"
 #include <stdlib.h>
 
+// Forward forward (lol) declarations
 static Tensor* linear_forward(Layer *self, Tensor *input); 
 static Tensor* relu_forward(Layer *self, Tensor *input);
 static Tensor* sigmoid_forward(Layer *self, Tensor *input);
@@ -48,4 +49,63 @@ Layer* layer_create(LayerConfig config) {
             return NULL;
     }
     return layer;
+}
+
+void layer_free(Layer *layer) {
+    if (!layer) return; 
+
+    if (layer->weights) tensor_free(layer->weights);
+    if (layer->bias) tensor_free(layer->bias);
+    if (layer->output) tensor_free(layer->output);
+
+    free(layer);
+}
+
+Tensor* layer_forward(Layer *layer, Tensor *input) {
+    if (!layer || !layer->forward) return NULL; 
+    return layer->forward(layer, input);
+}
+
+// Layer forward implementations
+static Tensor* linear_forward(Layer *self, Tensor *input) {
+    if (!self || !input || !self->weights || !self->bias) return NULL; 
+
+    Tensor *Z_0 = tensor_matmul(input, self->weights);
+    Tensor *Z = tensor_add(Z_0, self->bias);
+
+    return Z;
+}
+
+static Tensor* relu_forward(Layer *self, Tensor *input) {
+    return tensor_relu(input);
+}
+
+static Tensor* sigmoid_forward(Layer *self, Tensor *input) {
+    return tensor_sigmoid(input);
+}
+
+static Tensor* tanh_forward(Layer *self, Tensor *input) {
+    return tensor_tanh(input);
+}
+
+static Tensor* softmax_forward(Layer *self, Tensor *input) {
+    return tensor_softmax(input);
+}
+
+// Utilities
+void layer_zero_grad(Layer *layer) {
+    if (!layer) return;
+
+    for (size_t i = 0; i < layer->num_parameters; i++) {
+        if (layer->parameters[i]->grad) {
+            tensor_zero_grad(layer->parameters[i]);
+        }
+    }
+}
+
+Tensor** layer_get_parameters(Layer *layer, size_t *num_params) {
+    if (!layer || !num_params) return NULL;
+
+    *num_params = layer->num_parameters;
+    return layer->parameters;
 }

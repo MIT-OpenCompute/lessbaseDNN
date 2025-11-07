@@ -12,7 +12,6 @@ typedef enum {
     OP_MUL,
     OP_MATMUL,
     OP_TRANSPOSE,
-    OP_LINEAR,
     OP_RELU,
     OP_SIGMOID,
     OP_TANH,

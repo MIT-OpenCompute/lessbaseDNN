@@ -15,8 +15,18 @@ void backward_add(Tensor *C) {
     
     if (B->requires_grad) {
         if (!B->grad) B->grad = (float *)calloc(B->size, sizeof(float));
-        for (size_t i = 0; i < B->size; i++) {
-            B->grad[i] += C->grad[i];
+
+        if (A->ndim == 2 && B->ndim == 1 && A->shape[1] == B->shape[0]) {
+            // also a temporary fix, should add broadcasting support properly
+            for (size_t i = 0; i < A->shape[0]; i++) {
+                for (size_t j = 0; j < B->shape[0]; j++) {
+                    B->grad[j] += C->grad[i * A->shape[1] + j];
+                }
+            }
+        } else {
+            for (size_t i = 0; i < B->size; i++) {
+                B->grad[i] += C->grad[i];
+            }
         }
     }
 }
@@ -59,29 +69,91 @@ void backward_mul(Tensor *C) {
     }
 }
 
-void backward_matmul(Tensor *C) {
-    Tensor *A = C->inputs[0];
-    Tensor *B = C->inputs[1];
+void backward_matmul(Tensor *output) {
+    if (!output || output->num_inputs != 2) return;
     
-    if (A->requires_grad) {
-        if (!A->grad) A->grad = (float *)calloc(A->size, sizeof(float));
-        for (size_t i = 0; i < A->shape[0]; i++) {
-            for (size_t k = 0; k < A->shape[1]; k++) {
+    Tensor *A = output->inputs[0];
+    Tensor *B = output->inputs[1];
+    
+    if (A->ndim == 1 && B->ndim == 1) {
+        if (A->requires_grad) {
+            // dL/dA = dL/dout * B (element-wise)
+            for (size_t i = 0; i < A->size; i++) {
+                A->grad[i] += output->grad[0] * B->data[i];
+            }
+        }
+        if (B->requires_grad) {
+            // dL/dB = dL/dout * A (element-wise)
+            for (size_t i = 0; i < B->size; i++) {
+                B->grad[i] += output->grad[0] * A->data[i];
+            }
+        }
+    }
+    
+    else if (A->ndim == 2 && B->ndim == 1) {
+        if (A->requires_grad) {
+            // dL/dA = dL/dout ⊗ B^T (outer product)
+            for (size_t i = 0; i < A->shape[0]; i++) {
+                for (size_t j = 0; j < A->shape[1]; j++) {
+                    A->grad[i * A->shape[1] + j] += output->grad[i] * B->data[j];
+                }
+            }
+        }
+        if (B->requires_grad) {
+            // dL/dB = A^T @ dL/dout
+            for (size_t j = 0; j < B->shape[0]; j++) {
+                float acc = 0.0f;
+                for (size_t i = 0; i < A->shape[0]; i++) {
+                    acc += A->data[i * A->shape[1] + j] * output->grad[i];
+                }
+                B->grad[j] += acc;
+            }
+        }
+    }
+    
+    else if (A->ndim == 1 && B->ndim == 2) {
+        if (A->requires_grad) {
+            // dL/dA = dL/dout @ B^T
+            for (size_t i = 0; i < A->shape[0]; i++) {
+                float acc = 0.0f;
                 for (size_t j = 0; j < B->shape[1]; j++) {
-                    A->grad[i * A->shape[1] + k] += 
-                        C->grad[i * B->shape[1] + j] * B->data[k * B->shape[1] + j];
+                    acc += output->grad[j] * B->data[i * B->shape[1] + j];
+                }
+                A->grad[i] += acc;
+            }
+        }
+        if (B->requires_grad) {
+            // dL/dB = A^T ⊗ dL/dout (outer product)
+            for (size_t i = 0; i < B->shape[0]; i++) {
+                for (size_t j = 0; j < B->shape[1]; j++) {
+                    B->grad[i * B->shape[1] + j] += A->data[i] * output->grad[j];
                 }
             }
         }
     }
     
-    if (B->requires_grad) {
-        if (!B->grad) B->grad = (float *)calloc(B->size, sizeof(float));
-        for (size_t k = 0; k < B->shape[0]; k++) {
-            for (size_t j = 0; j < B->shape[1]; j++) {
-                for (size_t i = 0; i < A->shape[0]; i++) {
-                    B->grad[k * B->shape[1] + j] += 
-                        C->grad[i * B->shape[1] + j] * A->data[i * A->shape[1] + k];
+    else if (A->ndim == 2 && B->ndim == 2) {
+        if (A->requires_grad) {
+            // dL/dA = dL/dout @ B^T
+            for (size_t i = 0; i < A->shape[0]; i++) {
+                for (size_t j = 0; j < A->shape[1]; j++) {
+                    float acc = 0.0f;
+                    for (size_t k = 0; k < B->shape[1]; k++) {
+                        acc += output->grad[i * output->shape[1] + k] * B->data[j * B->shape[1] + k];
+                    }
+                    A->grad[i * A->shape[1] + j] += acc;
+                }
+            }
+        }
+        if (B->requires_grad) {
+            // dL/dB = A^T @ dL/dout
+            for (size_t i = 0; i < B->shape[0]; i++) {
+                for (size_t j = 0; j < B->shape[1]; j++) {
+                    float acc = 0.0f;
+                    for (size_t k = 0; k < A->shape[0]; k++) {
+                        acc += A->data[k * A->shape[1] + i] * output->grad[k * output->shape[1] + j];
+                    }
+                    B->grad[i * B->shape[1] + j] += acc;
                 }
             }
         }

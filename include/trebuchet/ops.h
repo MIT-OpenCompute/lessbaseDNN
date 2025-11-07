@@ -16,9 +16,6 @@ Tensor* tensor_sigmoid(Tensor *Z);
 Tensor* tensor_tanh(Tensor *Z);
 Tensor* tensor_softmax(Tensor *Z);
 
-// Linear combination
-Tensor* tensor_linear(Tensor *X, Tensor *W, Tensor *b);
-
 // Loss functions
 Tensor* tensor_mse(Tensor *predictions, Tensor *targets);
 Tensor* tensor_cross_entropy(Tensor *predictions, Tensor *targets);
