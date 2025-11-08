@@ -1,5 +1,5 @@
 /*
- * Unit tests for autograd.c
+ * AI generated Unit tests for autograd.c
  * Tests gradient computation for all operations and activation functions
  */
 

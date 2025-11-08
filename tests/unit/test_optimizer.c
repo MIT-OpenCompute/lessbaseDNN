@@ -1,5 +1,5 @@
 /*
- * Unit tests for optimizer.c
+ * AI Generated Unit tests for optimizer.c
  * Tests SGD and Adam optimizers, parameter updates, and state management
  */
 

@@ -1,5 +1,5 @@
 /*
- * Unit tests for ops.c
+ * AI generated Unit tests for ops.c
  * Tests tensor operations, activations, loss functions, and utilities
  */
 

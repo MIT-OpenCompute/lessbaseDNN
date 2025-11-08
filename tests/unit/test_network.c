@@ -1,5 +1,5 @@
 /*
- * Unit tests for network.c
+ * AI generated Unit tests for network.c
  * Tests network creation, layer management, forward pass, training, and utilities
  */
 

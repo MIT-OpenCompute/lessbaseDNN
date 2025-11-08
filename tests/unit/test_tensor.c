@@ -1,5 +1,5 @@
 /*
- * Unit tests for tensor.c
+ * AI Generated Unit tests for tensor.c
  * Tests tensor creation, initialization, autograd, memory management, and utilities
  */
 

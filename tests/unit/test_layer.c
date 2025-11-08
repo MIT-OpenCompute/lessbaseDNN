@@ -1,5 +1,5 @@
 /*
- * Unit tests for layer.c
+ * AI generated Unit tests for layer.c
  * Tests layer creation, forward pass, parameter management, and different layer types
  */
 

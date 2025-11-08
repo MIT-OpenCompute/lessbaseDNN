@@ -1,6 +1,8 @@
 #include "basednn/basednn.h"
 #include <stdio.h>
 
+// ai generated xor test
+
 int main() {
     Network *net = network_create();
     network_add_layer(net, layer_create(LINEAR(2, 4)));
