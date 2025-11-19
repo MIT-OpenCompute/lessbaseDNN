@@ -4,8 +4,10 @@
 #include <string.h>
 #include <math.h>
 
+// ====================================================
+// TopoSort
+// ====================================================
 
-// Autograd helper functions
 static void topological_sort_util(Tensor *T, Tensor **visited, size_t *visited_count, Tensor **stack, size_t *stack_count, size_t max_size) {
     for (size_t i = 0; i < *visited_count; i++) {
         if (visited[i] == T) return; 
@@ -26,7 +28,10 @@ static void topological_sort_util(Tensor *T, Tensor **visited, size_t *visited_c
     }
 }
 
-// Tensor creation/destruction
+// ====================================================
+// Tensor Creation and Destruction
+// ====================================================
+
 Tensor* tensor_create(size_t *shape, size_t ndim) {
     Tensor *T = (Tensor *)malloc(sizeof(Tensor)); 
     if (!T) return NULL; 
@@ -109,7 +114,10 @@ void tensor_free(Tensor *T) {
     free(T); 
 }
 
-// Autograd functions
+// ====================================================
+// Autograd Helpers
+// ====================================================
+
 void tensor_set_requires_grad(Tensor *T, int requires_grad) {
     if (!T) return; 
     T->requires_grad = requires_grad;
@@ -158,6 +166,10 @@ void tensor_fill(Tensor *T, float value) {
         T->data[i] = value;
     }
 }
+
+// ====================================================
+// Utilities
+// ====================================================
 
 void tensor_print(Tensor *T) {
     if (!T) return;

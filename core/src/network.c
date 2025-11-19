@@ -7,7 +7,10 @@
 
 #define INITIAL_CAPACITY 8
 
-// Network management
+// ====================================================
+// Network Management
+// ====================================================
+
 Network* network_create() {
     Network *net = (Network *)malloc(sizeof(Network)); 
     if (!net) return NULL;
@@ -57,7 +60,10 @@ void network_free(Network *net) {
     free(net);
 }
 
-// Forward pass
+// ====================================================
+// Forward
+// ====================================================
+
 Tensor* network_forward(Network *net, Tensor *input) {
     if (!net || !input) return NULL; 
 
@@ -71,7 +77,10 @@ Tensor* network_forward(Network *net, Tensor *input) {
     return output;
 }
 
-// Training
+// ====================================================
+// Network Training
+// ====================================================
+
 void network_train(Network *net, Optimizer *opt,  Tensor *input, Tensor *target, size_t epochs, size_t batch_size, const char *loss_name, int verbose) {
     if (!net || !opt || !input || !target) return; 
 
@@ -171,7 +180,10 @@ void network_zero_grad(Network *net) {
     }
 }
 
+// ====================================================
 // Utilities
+// ====================================================
+
 void network_print(Network *net) {
     if (!net) return; 
 
@@ -264,6 +276,10 @@ float network_accuracy(Tensor *predictions, Tensor *targets) {
     return (float)correct / num_samples;
 }
 
+// ====================================================
+// Save/Load
+// ====================================================
+
 static void layer_save(Layer *layer, FILE *file) {
     if (!layer || !file) return;
 
@@ -271,16 +287,13 @@ static void layer_save(Layer *layer, FILE *file) {
     fwrite(&name_len, sizeof(size_t), 1, file);
     fwrite(layer->name, sizeof(char), name_len, file);
 
-    // Save config data size and data
     fwrite(&layer->config_data_size, sizeof(size_t), 1, file);
     if (layer->config_data_size > 0 && layer->config_data) {
         fwrite(layer->config_data, 1, layer->config_data_size, file);
     }
 
-    // Save number of parameters
     fwrite(&layer->num_parameters, sizeof(size_t), 1, file);
     
-    // Save each parameter's shape and data
     for (size_t i = 0; i < layer->num_parameters; i++) {
         Tensor *param = layer->parameters[i];
         fwrite(&param->ndim, sizeof(size_t), 1, file);
@@ -341,7 +354,6 @@ static Layer* layer_load(FILE *file) {
         }
     }
 
-    // Create layer using registry
     LayerConfig config = {.name = name, .params = config_data};
     Layer *layer = layer_create(config);
     if (!layer) {
@@ -350,7 +362,6 @@ static Layer* layer_load(FILE *file) {
         return NULL;
     }
 
-    // Load number of parameters
     size_t num_params;
     if (fread(&num_params, sizeof(size_t), 1, file) != 1) {
         layer_free(layer);
@@ -359,7 +370,6 @@ static Layer* layer_load(FILE *file) {
         return NULL;
     }
 
-    // Load each parameter's data
     for (size_t i = 0; i < num_params; i++) {
         if (i >= layer->num_parameters) {
             fprintf(stderr, "Error: Parameter count mismatch for layer %s\n", name);

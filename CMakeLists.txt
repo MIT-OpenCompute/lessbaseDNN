@@ -4,9 +4,6 @@ project(basednn C)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -g")
 
-# Backend options
-option(ENABLE_WEBGPU "Enable WebGPU acceleration backend" ON)
-
 # Include directories
 include_directories(core/include)
 
@@ -23,57 +20,6 @@ set(SOURCES
 # Create library
 add_library(basednn ${SOURCES})
 target_link_libraries(basednn m)
-
-# WebGPU backend (cross-platform)
-if(ENABLE_WEBGPU)
-    set(WEBGPU_SOURCES
-        backend/webgpu/webgpu_backend.c
-        backend/webgpu/webgpu_ops.c
-    )
-    
-    target_sources(basednn PRIVATE ${WEBGPU_SOURCES})
-    target_include_directories(basednn PRIVATE backend/webgpu)
-    
-    # Find WebGPU library (Dawn)
-    # Users should set WEBGPU_DIR to the Dawn installation directory
-    if(DEFINED ENV{WEBGPU_DIR})
-        set(WEBGPU_DIR $ENV{WEBGPU_DIR})
-    else()
-        set(WEBGPU_DIR "$ENV{HOME}/.dawn/install")
-    endif()
-    
-    if(EXISTS "${WEBGPU_DIR}/include/webgpu/webgpu.h")
-        target_include_directories(basednn PRIVATE 
-            ${WEBGPU_DIR}/include
-            ${WEBGPU_DIR}/include/webgpu
-        )
-        
-        # Link Dawn libraries
-        target_link_libraries(basednn 
-            ${WEBGPU_DIR}/lib/libwebgpu_dawn.a
-            ${WEBGPU_DIR}/lib/libdawn_proc.a
-        )
-        
-        # Dawn requires Metal framework and C++ runtime on macOS
-        if(APPLE)
-            target_link_libraries(basednn 
-                "-framework Metal" 
-                "-framework CoreGraphics" 
-                "-framework Foundation" 
-                "-framework QuartzCore" 
-                "-framework IOKit" 
-                "-framework IOSurface"
-                "c++"
-            )
-        endif()
-        
-        target_compile_definitions(basednn PRIVATE HAS_WEBGPU)
-        message(STATUS "WebGPU acceleration enabled using Dawn (${WEBGPU_DIR})")
-    else()
-        message(WARNING "WebGPU enabled but Dawn not found at ${WEBGPU_DIR}")
-        message(WARNING "Build Dawn from: https://dawn.googlesource.com/dawn")
-    endif()
-endif()
 
 # Enable testing
 enable_testing()
@@ -102,14 +48,11 @@ target_link_libraries(xor basednn m)
 add_executable(mnist core/tests/full/mnist.c)
 target_link_libraries(mnist basednn m)
 
-# Add WebGPU flags to test executables if enabled
-if(ENABLE_WEBGPU AND WEBGPU_DIR)
-    target_compile_definitions(mnist PRIVATE HAS_WEBGPU)
-    target_compile_definitions(xor PRIVATE HAS_WEBGPU)
-endif()
-
 # Examples (if they exist)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples/custom_tensor_op.c")
     add_executable(custom_tensor_op examples/custom_tensor_op.c)
     target_link_libraries(custom_tensor_op basednn m)
 endif()
+
+# Custom compiler rules to allow relaxed static inline in C99
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-function")

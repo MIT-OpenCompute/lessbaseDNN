@@ -5,41 +5,6 @@
 #include <math.h>
 
 // ====================================================
-// Backend Dispatch Helper
-// ====================================================
-
-// Forward declarations of CPU-only implementations (non-static for backend use)
-Tensor* tensor_add_cpu(Tensor *A, Tensor *B);
-Tensor* tensor_sub_cpu(Tensor *A, Tensor *B);
-Tensor* tensor_mul_cpu(Tensor *A, Tensor *B);
-Tensor* tensor_matmul_cpu(Tensor *A, Tensor *B);
-Tensor* tensor_relu_cpu(Tensor *Z);
-Tensor* tensor_sigmoid_cpu(Tensor *Z);
-Tensor* tensor_tanh_cpu(Tensor *Z);
-Tensor* tensor_softmax_cpu(Tensor *Z);
-
-// Check if a backend implementation exists and use it
-#define DISPATCH_OP_2(op_name, cpu_impl, A, B) \
-    do { \
-        OpFn backend_fn = get_operation_fn(op_name); \
-        if (backend_fn) { \
-            typedef Tensor* (*Op2Fn)(Tensor*, Tensor*); \
-            return ((Op2Fn)backend_fn)(A, B); \
-        } \
-        return cpu_impl(A, B); \
-    } while(0)
-
-#define DISPATCH_OP_1(op_name, cpu_impl, A) \
-    do { \
-        OpFn backend_fn = get_operation_fn(op_name); \
-        if (backend_fn) { \
-            typedef Tensor* (*Op1Fn)(Tensor*); \
-            return ((Op1Fn)backend_fn)(A); \
-        } \
-        return cpu_impl(A); \
-    } while(0)
-
-// ====================================================
 // Gradient Update Helpers
 // ====================================================
 
@@ -101,8 +66,7 @@ static float add_func(float x, float y) { return x + y; }
 static float sub_func(float x, float y) { return x - y; }
 static float mul_func(float x, float y) { return x * y; }
 
-// CPU-only implementation (for backend fallback)
-Tensor* tensor_add_cpu(Tensor *A, Tensor *B) {
+Tensor* tensor_add(Tensor *A, Tensor *B) {
     if (!A || !B) return NULL;
     
     Tensor *C = tensor_create(A->shape, A->ndim);
@@ -124,11 +88,6 @@ Tensor* tensor_add_cpu(Tensor *A, Tensor *B) {
 
     tensor_ewise(A, B, C, add_func, "add", backward_add);
     return C;
-}
-
-// Public API with backend dispatch
-Tensor* tensor_add(Tensor *A, Tensor *B) {
-    DISPATCH_OP_2("add", tensor_add_cpu, A, B);
 }
 
 void backward_add(Tensor *C) {
@@ -162,7 +121,7 @@ void backward_add(Tensor *C) {
     }
 }
 
-Tensor* tensor_sub_cpu(Tensor *A, Tensor *B) {
+Tensor* tensor_sub(Tensor *A, Tensor *B) {
     if (!A || !B) return NULL;
     
     Tensor *C = tensor_create(A->shape, A->ndim);
@@ -170,10 +129,6 @@ Tensor* tensor_sub_cpu(Tensor *A, Tensor *B) {
 
     tensor_ewise(A, B, C, sub_func, "sub", backward_sub);
     return C;
-}
-
-Tensor* tensor_sub(Tensor *A, Tensor *B) {
-    DISPATCH_OP_2("sub", tensor_sub_cpu, A, B);
 }
 
 
@@ -198,7 +153,7 @@ void backward_sub(Tensor *C) {
     }
 }
 
-Tensor* tensor_mul_cpu(Tensor *A, Tensor *B) {
+Tensor* tensor_mul(Tensor *A, Tensor *B) {
     if (!A || !B) return NULL;
     
     Tensor *C = tensor_create(A->shape, A->ndim);
@@ -206,10 +161,6 @@ Tensor* tensor_mul_cpu(Tensor *A, Tensor *B) {
 
     tensor_ewise(A, B, C, mul_func, "mul", backward_mul);
     return C;
-}
-
-Tensor* tensor_mul(Tensor *A, Tensor *B) {
-    DISPATCH_OP_2("mul", tensor_mul_cpu, A, B);
 }
 
 void backward_mul(Tensor *C) {
@@ -237,7 +188,7 @@ void backward_mul(Tensor *C) {
 // Linear Algebra
 // ====================================================
 
-Tensor* tensor_matmul_cpu(Tensor *A, Tensor *B) {
+Tensor* tensor_matmul(Tensor *A, Tensor *B) {
     if (!A || !B) return NULL;
     
     if (A->ndim == 1 && B->ndim == 1) {
@@ -309,14 +260,6 @@ Tensor* tensor_matmul_cpu(Tensor *A, Tensor *B) {
     } else {
         return NULL; 
     }
-}
-
-Tensor* tensor_matmul(Tensor *A, Tensor *B) {
-    // Dispatch to backend for 2D x 2D only
-    if (A && B && A->ndim == 2 && B->ndim == 2) {
-        DISPATCH_OP_2("matmul", tensor_matmul_cpu, A, B);
-    }
-    return tensor_matmul_cpu(A, B);
 }
 
 void backward_matmul(Tensor *output) {
@@ -446,7 +389,7 @@ void backward_transpose2d(Tensor *C) {
 // Activation Functions
 // ====================================================
 
-Tensor* tensor_relu_cpu(Tensor *Z) {
+Tensor* tensor_relu(Tensor *Z) {
     if (!Z) return NULL;
 
     Tensor *A = tensor_create(Z->shape, Z->ndim); 
@@ -461,11 +404,7 @@ Tensor* tensor_relu_cpu(Tensor *Z) {
     return A; 
 }
 
-Tensor* tensor_relu(Tensor *Z) {
-    DISPATCH_OP_1("relu", tensor_relu_cpu, Z);
-}
-
-Tensor* tensor_sigmoid_cpu(Tensor *Z) {
+Tensor* tensor_sigmoid(Tensor *Z) {
     if (!Z) return NULL;
 
     Tensor *A = tensor_create(Z->shape, Z->ndim);
@@ -480,10 +419,6 @@ Tensor* tensor_sigmoid_cpu(Tensor *Z) {
     return A;
 }
 
-Tensor* tensor_sigmoid(Tensor *Z) {
-    DISPATCH_OP_1("sigmoid", tensor_sigmoid_cpu, Z);
-}
-
 void backward_relu(Tensor *A) {
     Tensor *Z = A->inputs[0];
     
@@ -495,7 +430,7 @@ void backward_relu(Tensor *A) {
     }
 }
 
-Tensor* tensor_tanh_cpu(Tensor *Z) {
+Tensor* tensor_tanh(Tensor *Z) {
     if (!Z) return NULL;
 
     Tensor *A = tensor_create(Z->shape, Z->ndim);
@@ -508,10 +443,6 @@ Tensor* tensor_tanh_cpu(Tensor *Z) {
     grad_update_one_var(Z, A, NULL, "tanh", backward_tanh);
 
     return A;
-}
-
-Tensor* tensor_tanh(Tensor *Z) {
-    DISPATCH_OP_1("tanh", tensor_tanh_cpu, Z);
 }
 
 void backward_tanh(Tensor *A) {
@@ -538,7 +469,7 @@ void backward_sigmoid(Tensor *A) {
     }
 }
 
-Tensor* tensor_softmax_cpu(Tensor *Z) {
+Tensor* tensor_softmax(Tensor *Z) {
     if (!Z) return NULL;
 
     Tensor *A = tensor_create(Z->shape, Z->ndim);
@@ -569,10 +500,6 @@ Tensor* tensor_softmax_cpu(Tensor *Z) {
     grad_update_one_var(Z, A, NULL, "softmax", backward_softmax);
 
     return A;
-}
-
-Tensor* tensor_softmax(Tensor *Z) {
-    DISPATCH_OP_1("softmax", tensor_softmax_cpu, Z);
 }
 
 void backward_softmax(Tensor *A) {
@@ -817,4 +744,26 @@ Tensor* tensor_slice(Tensor *input, size_t start, size_t end) {
     slice->extra_data = NULL; 
 
     return slice;
+}
+
+// ====================================================
+// Operation Registration
+// ====================================================
+
+void ops_register_builtins(void) {
+    register_loss("mse", tensor_mse);
+    register_loss("cross_entropy", tensor_cross_entropy);
+    register_loss("binary_cross_entropy", tensor_binary_cross_entropy);
+    register_tensor_op("add", backward_add);
+    register_tensor_op("sub", backward_sub);
+    register_tensor_op("mul", backward_mul);
+    register_tensor_op("matmul", backward_matmul);
+    register_tensor_op("transpose2d", backward_transpose2d);
+    register_tensor_op("relu", backward_relu);
+    register_tensor_op("sigmoid", backward_sigmoid);
+    register_tensor_op("tanh", backward_tanh);
+    register_tensor_op("softmax", backward_softmax);
+    register_tensor_op("mse", backward_mse);
+    register_tensor_op("cross_entropy", backward_cross_entropy);
+    register_tensor_op("binary_cross_entropy", backward_binary_cross_entropy);
 }

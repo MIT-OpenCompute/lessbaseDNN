@@ -3,10 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#ifdef HAS_WEBGPU
-#include "../../../backend/webgpu/webgpu_backend.h"
-#endif
-
 // ./build/mnist
 
 uint32_t read_uint32(FILE *f) {
@@ -59,15 +55,7 @@ int main() {
     fflush(stdout);
     basednn_init();
     
-    #ifdef HAS_WEBGPU
-    if (webgpu_available()) {
-        printf("WebGPU GPU acceleration enabled\n");
-    } else {
-        printf("WebGPU not available, using CPU\n");
-    }
-    #else
     printf("Using CPU backend\n");
-    #endif
     
     Tensor *train_images, *train_labels;
     Tensor *test_images, *test_labels;

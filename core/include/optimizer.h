@@ -44,4 +44,7 @@ void optimizer_step(Optimizer *opt);
 void optimizer_zero_grad(Optimizer *opt);
 void optimizer_free(Optimizer *opt); 
 
+// Registration
+void optimizer_register_builtins(void);
+
 #endif

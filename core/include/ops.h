@@ -59,7 +59,10 @@ void backward_binary_cross_entropy(Tensor *L);
 // Slice
 // ====================================================
 
-Tensor* tensor_slice(Tensor *input, size_t start, size_t end); 
+// Slice
+Tensor* tensor_slice(Tensor *input, size_t start, size_t end);
 
+// Registration
+void ops_register_builtins(void);
 
 #endif

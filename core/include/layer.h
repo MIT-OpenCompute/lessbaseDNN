@@ -45,4 +45,7 @@ Tensor* layer_forward(Layer *layer, Tensor *input);
 void layer_zero_grad(Layer *layer);
 Tensor** layer_get_parameters(Layer *layer, size_t *num_params);
 
+// Registration
+void layer_register_builtins(void);
+
 #endif
